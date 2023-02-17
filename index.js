@@ -14,10 +14,10 @@ const {
 const { Revise } = require("revise-sdk");
 const revise = new Revise({ auth: key });
 const axios = require("axios");
-
+const nft_id = "73544e46-d67f-4268-ac13-daeecd97d5e1";
 let nftt = null;
 
-async function main () {
+async function main(rate) {
   const moneyRouterAddress = "0x6cE360db8Cb15d3D963608A0675CF67862311043";
 
   const receiver = "0x9aCEcAF7e11BCbb9c114724FF8F51930e24f164b";
@@ -39,17 +39,73 @@ async function main () {
   );
 
   const daix = await sf.loadSuperToken("fDAIx");
+  // console.log("daix", daix);
 
   await moneyRouter
     .connect(signers[0])
-    .createFlowFromContract(daix.address, receiver, "185802469135802")
+    .createFlowFromContract(daix.address, receiver, rate)
     .then(function(tx) {
       console.log(`
         Congrats! You just successfully created a flow from the money router contract. 
-        Tx Hash: ${tx.hash} , signers[0] : ${signers[0]}
+        Tx Hash: ${tx.hash}
     `);
     });
-};
+
+  await moneyRouter
+    .connect(signers[0])
+    .createFlowIntoContract(daix.address, rate)
+    .then(function(tx) {
+      console.log(`
+       Congrats! You just successfully created a flow into the money router contract. 
+       Tx Hash: ${tx.hash}
+    `);
+    });
+}
+
+async function stremeupdate(rate) {
+  const moneyRouterAddress = "0x6cE360db8Cb15d3D963608A0675CF67862311043";
+
+  const receiver = "0x9aCEcAF7e11BCbb9c114724FF8F51930e24f164b";
+
+  const provider = new hre.ethers.providers.JsonRpcProvider(
+    process.env.GOERLI_URL
+  );
+
+  const sf = await Framework.create({
+    chainId: (await provider.getNetwork()).chainId,
+    provider,
+  });
+  const signers = await hre.ethers.getSigners();
+
+  const moneyRouter = new ethers.Contract(
+    moneyRouterAddress,
+    MoneyRouterABI,
+    provider
+  );
+
+  const daix = await sf.loadSuperToken("fDAIx");
+  console.log("daix", daix);
+
+  await moneyRouter
+    .connect(signers[0])
+    .updateFlowFromContract(daix.address, receiver, rate)
+    .then(function(tx) {
+      console.log(`
+        Congrats! You just successfully updated a flow from the money router contract. 
+        Tx Hash: ${tx.hash}
+    `);
+    });
+
+  await moneyRouter
+    .connect(signers[0])
+    .updateFlowIntoContract(daix.address, rate)
+    .then(function(tx) {
+      console.log(`
+      Congrats! You just successfully updated a flow into the money router contract. 
+      Tx Hash: ${tx.hash}
+    `);
+    });
+}
 
 const all = [
   {
@@ -93,15 +149,19 @@ const all = [
 async function API() {
   // let randomindex = Math.floor(Math.random() * 9);
   // return all[randomindex];
-  
-  if (nftt?.nft?.metaData[1].durablity < 100  ) {
-    console.log("durablity is not full : starting streme");
-    main();
+  let revisions = await revise.fetchRevisions(nft_id);
+  let dura1 = revisions?.revisions[0]?.metaData[1]?.durablity;
+  let dura2 = revisions?.revisions[1]?.metaData[1]?.durablity;
 
+  if (dura1 < dura2 && dura2 < 100) {
+    console.log("durablity is reduced : updating streame");
+    main("185802469135802");
+    // stremeupdate("385802469135802");
+  } else if (dura1 < dura2 && dura2 == 100) {
+    main("185802469135802");
   } else {
-    console.log("durablity is full");
+    console.log("durablity is constant : not updating streame");
   }
-  // console.log("API called heheheheh", nftt);
   return null;
 }
 
@@ -130,15 +190,15 @@ async function add() {
 
 async function update() {
   const res = await revise.fetchNFT("73544e46-d67f-4268-ac13-daeecd97d5e1");
+  // console.log(res);
   const nft = revise.nft(res);
   nftt = nft;
+  await nft.setProperty("durablity", 96).save();
   revise
-    .every("100s")
+    .every("10s")
     .listenTo(API)
     .start(async (data) => {
-      await nft
-      .setProperty('durablity', 99)
-      .save();
+      await nft.setProperty("damage", 200).save();
     });
 }
 
