@@ -26,6 +26,12 @@ module.exports = {
       blockGasLimit: 1000000000,
     },
   },
+  settings: {
+    optimizer: {
+      enabled: true,
+      runs: 1500,
+    },
+  },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD",
