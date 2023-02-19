@@ -3,22 +3,49 @@ const { Framework } = require("@superfluid-finance/sdk-core");
 const { ethers } = require("hardhat");
 require("dotenv").config();
 const MoneyRouterABI = require("./artifacts/contracts/MoneyRouter.sol/MoneyRouter.json")
-  .abi;
-
-const {
-  key,
-  collectionId,
-  openweatherapikey,
-  weatherapikey,
-} = require("./config.js");
+.abi;
+const { key, collectionId } = require("./config.js");
 const { Revise } = require("revise-sdk");
 const revise = new Revise({ auth: key });
-const axios = require("axios");
+const PushAPI = require("@pushprotocol/restapi");
+
 const nft_id = "73544e46-d67f-4268-ac13-daeecd97d5e1";
-let nftt = null;
 
 const initflowrate = 100000000000000;
 const receiveraddress = "0x9aCEcAF7e11BCbb9c114724FF8F51930e24f164b";
+
+const etherss = require("ethers");
+const PK = process.env.PK;
+const Pkey = `0x${PK}`;
+const signer = new etherss.Wallet(Pkey);
+
+const sendNotification = async (address , title , body) => {
+  try {
+    const apiResponse = await PushAPI.payloads.sendNotification({
+      signer,
+      type: 3, // target
+      identityType: 2, // direct payload
+      notification: {
+        title: `${title}`,
+        body: `${body}`,
+      },
+      payload: {
+        title: `${title}`,
+        body: `${body}`,
+        cta: "",
+        img: "",
+      },
+      recipients: `eip155:5:${address}`, // recipient address
+      channel: "eip155:5:0xd8515Ee7b256C3c0Ba9465fCDC45599437d5826A", // your channel address
+      env: "staging",
+    });
+
+    // apiResponse?.status === 204, if sent successfully!
+    console.log("API repsonse: ", apiResponse);
+  } catch (err) {
+    console.error("Error: ", err);
+  }
+};
 
 async function streamstart(rate, recaddress) {
   const moneyRouterAddress = "0x6cE360db8Cb15d3D963608A0675CF67862311043";
@@ -192,17 +219,21 @@ async function API() {
   let dura2 = revisions?.revisions[1]?.metaData[1]?.durablity;
   let initdura = 100;
 
+  // streamdelete(receiveraddress);
+  // sendNotification("0x1d0923340a6c3A53f6E99d4C3EAE0b47B41c5880" , "stream deleted" , `flowrate is 0`);
+
   if (dura1 < dura2 && dura2 < 100) {
     console.log("durablity is reduced : updating streame");
     let newflowrate = updateflowrate(initdura, dura1, initflowrate, "linear");
     console.log("new flow rate", newflowrate);
     streamupdate(newflowrate.toString(), receiveraddress);
+    sendNotification("0x1d0923340a6c3A53f6E99d4C3EAE0b47B41c5880" , "flowrate updated" , `flowrate is updated to ${newflowrate}`);
   } else if (dura1 < dura2 && dura2 == 100) {
     console.log("durablity is reduced for the first time : starting streame");
     streamstart(initflowrate.toString(), receiveraddress);
+    sendNotification("0x1d0923340a6c3A53f6E99d4C3EAE0b47B41c5880" , "stream started" , `flowrate is currently ${initflowrate}`);
   } else {
     console.log("durablity is constant : not updating streame");
-    streamdelete(receiveraddress);
   }
   return null;
 }
@@ -234,8 +265,7 @@ async function update() {
   const res = await revise.fetchNFT("73544e46-d67f-4268-ac13-daeecd97d5e1");
   // console.log(res);
   const nft = revise.nft(res);
-  nftt = nft;
-  await nft.setProperty("durablity", 97).save();
+  await nft.setProperty("durablity", 98).save();
   revise
     .every("30s")
     .listenTo(API)
